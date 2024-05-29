@@ -53,9 +53,9 @@ class FlashcardApp:
             # Tambah pertanyaan lain di sini
         ]
 
-        self.stack = []  # Stack to shuffle flashcards
-        self.forward_stack = deque()  # Stack to manage forward flashcards
-        self.backward_stack = deque()  # Stack to manage backward flashcards
+        self.stack = []  
+        self.forward_stack = deque()  
+        self.backward_stack = deque()  
         self.shuffle_flashcards()
 
         self.correct_answers = 0
