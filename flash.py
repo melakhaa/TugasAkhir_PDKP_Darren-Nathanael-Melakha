@@ -1,18 +1,17 @@
-import tkinter as tk # Mengimpor modul tkinter untuk membuat GUI
-from tkinter import messagebox # Mengimpor fungsi messagebox dari modul tkinter
-from collections import deque # Mengimpor deque untuk digunakan sebagai antrian (queue)
-import random # Mengimpor modul random untuk pengacakan
+import tkinter as tk
+from tkinter import messagebox
+from collections import deque
+import random
 
-# Membuat kelas Flashcard yang merepresentasikan sebuah flashcard
 class Flashcard:
     def __init__(self, question, answer):
-        self._question = question # Inisialisasi pertanyaan
-        self._answer = answer # Inisialisasi jawaban
+        self._question = question
+        self._answer = answer
 
-    def get_question(self): # Metode untuk mendapatkan pertanyaan
+    def get_question(self):
         return self._question
 
-    def get_answer(self): 
+    def get_answer(self):
         return self._answer
 
     def set_question(self, question):
@@ -51,13 +50,14 @@ class FlashcardApp:
             Flashcard("Apa nama ibu kota kerajaan Majapahit?", "Trowulan"),
             Flashcard("Siapa yang mengucapkan 'Proklamasi Kemerdekaan Indonesia'?", "Soekarno"),
             Flashcard("Apa nama perjanjian yang menyatukan Nusantara di bawah Gajah Mada?", "Sumpah Palapa")
+            # Tambah pertanyaan lain di sini
         ]
 
-        self.stack = [] 
-        self.queue = deque()  
+        self.stack = []  # Stack to shuffle flashcards
+        self.forward_stack = deque()  # Stack to manage forward flashcards
+        self.backward_stack = deque()  # Stack to manage backward flashcards
         self.shuffle_flashcards()
 
-        self.current_card_index = 0
         self.correct_answers = 0
         self.total_answers = 0
         self.answer_checked = False
@@ -101,32 +101,32 @@ class FlashcardApp:
         self.next_button.grid(row=0, column=3, padx=5)
 
     def shuffle_flashcards(self):
-        # Use stack to shuffle flashcards
+        # Shuffle the flashcards using the stack
         indices = list(range(len(self.flashcards)))
         random.shuffle(indices)
         for index in indices:
-            card = self.flashcards[index]
-            self.stack.append(card)
+            self.stack.append(self.flashcards[index])
+
         while self.stack:
-            self.queue.append(self.stack.pop())
+            self.forward_stack.append(self.stack.pop())
 
     def show_next_card(self):
-        if not self.queue:
-            self.shuffle_flashcards()
-        
-        card = self.queue.popleft()
-        self.queue.append(card)
-        self.question_label.config(text=card.get_question())
-        self.answer_label.config(text="")
-        self.user_input.delete(0, tk.END)
+        if self.forward_stack:
+            card = self.forward_stack[0]
+            self.question_label.config(text=card.get_question())
+            self.answer_label.config(text="")
+            self.user_input.delete(0, tk.END)
+            self.answer_checked = False
+        else:
+            self.show_score()
 
     def show_hint(self):
-        card = self.queue[0]
+        card = self.forward_stack[0]
         hint = card.get_answer()[:3] + "..."
         self.answer_label.config(text=hint)
 
     def check_answer(self):
-        card = self.queue[0]
+        card = self.forward_stack[0]
         user_answer = self.user_input.get().strip()
         self.total_answers += 1
         if user_answer.lower() == card.get_answer().lower():
@@ -139,18 +139,29 @@ class FlashcardApp:
         self.answer_checked = True
 
     def next_card(self):
-        self.queue.popleft()
-        self.show_next_card()
+        if self.forward_stack:
+            card = self.forward_stack.popleft()
+            self.backward_stack.appendleft(card)
+            self.show_next_card()
+
 
     def previous_card(self):
-        # Re-implement the previous button functionality using the queue
-        if self.current_card_index > 0:
-            self.current_card_index -= 1
-            self.show_next_card()
+        if self.backward_stack:
+            card = self.backward_stack.popleft()
+            self.forward_stack.appendleft(card)
+            self.show_previous_card()
+
+    def show_previous_card(self):
+        if self.forward_stack:
+            card = self.forward_stack[0]
+            self.question_label.config(text=card.get_question())
+            self.answer_label.config(text="")
+            self.user_input.delete(0, tk.END)
+            self.answer_checked = False
 
     def show_score(self):
         if self.total_answers == 0:
-            messagebox.showinfo("Session Complete", "No answers were checked.")
+            messagebox.showinfo("Peringatan", "Anda telah sampai di flashcard terakhir.")
         else:
             score_percentage = (self.correct_answers / self.total_answers) * 100
             self.show_scoreboard(score_percentage)
@@ -158,15 +169,20 @@ class FlashcardApp:
     def reset_game(self):
         self.correct_answers = 0
         self.total_answers = 0
-        self.current_card_index = 0
+        self.forward_stack.clear()
+        self.backward_stack.clear()
         self.shuffle_flashcards()
         self.show_next_card()
 
     def on_enter_key(self, event):
-        if not self.answer_checked:
+        if self.answer_checked:
+            self.next_card()
+        elif self.forward_stack:
             self.check_answer()
         else:
-            self.next_card()
+            messagebox.showinfo("Peringatan", "Tidak ada pertanyaan yang tersedia.")
+            self.user_input.focus_set()  # Set focus to the answer entry
+
 
     def show_scoreboard(self, score_percentage):
         scoreboard_window = tk.Toplevel(self.master)
@@ -177,19 +193,24 @@ class FlashcardApp:
         tk.Label(scoreboard_window, text=f"Nilaimu: {self.correct_answers}/{self.total_answers}", font=('Arial', 14)).pack()
 
         score_canvas = tk.Canvas(scoreboard_window, width=250, height=100, bg='#f7f7f7')
-        score_canvas.pack(pady=10)
+        score_canvas.pack()
 
-        score_canvas.create_arc((20, 20, 130, 130), start=90, extent=360, fill='red')
-        score_canvas.create_arc((20, 20, 130, 130), start=90, extent=(score_percentage * 3.6), fill='green')
+        green_bar_length = score_percentage * 2
 
-        tk.Button(scoreboard_window, text="Main Lagi", command=lambda: [scoreboard_window.destroy(), self.reset_game()], font=('Arial', 12), bg='#d1d1d1').pack(pady=10)
+        bar_left = (250 - green_bar_length) / 2
+        bar_right = bar_left + green_bar_length
 
-if __name__ == "__main__":
+        score_canvas.create_rectangle(bar_left, 50, bar_right, 80, fill='green')
+
+        text_x = (bar_left + bar_right) / 2
+        text_y = 65
+
+        score_canvas.create_text(text_x, text_y, text=f"{score_percentage:.2f}%", font=('Arial', 12))
+
+def main():
     root = tk.Tk()
     app = FlashcardApp(root)
     root.mainloop()
 
-
 if __name__ == "__main__":
     main()
-
