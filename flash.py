@@ -86,6 +86,9 @@ class FlashcardApp:
         self.next_button = tk.Button(self.button_frame, text="Next", command=self.next_card, font=('Arial', 12), bg='#d1d1d1', width=10)
         self.next_button.grid(row=0, column=2, padx=5)
 
+        self.hint_button = tk.Button(self.button_frame, text="Hint", command=self.show_hint, font=('Arial', 12), bg='#d1d1d1', width=10)
+        self.hint_button.grid(row=0, column=3, padx=5)
+
     def shuffle_flashcards(self):
         indices = list(range(len(self.flashcards)))
         random.shuffle(indices)
